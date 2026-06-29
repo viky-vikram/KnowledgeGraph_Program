@@ -509,7 +509,7 @@ def render_sidebar(config, schemes: list[dict], metadata: dict) -> int:
             </div>
             <div class="side-card">
                 <span class="side-label">Chunks indexed</span>
-                <span class="side-value">{metadata.get("chunk_count", 0)}</span>
+                <span class="side-value">{metadata.get("indexed_chunk_count", metadata.get("chunk_count", 0))}</span>
             </div>
             <p class="compact-note">Last scrape: {last_scraped}</p>
             <p class="compact-note">LangSmith tracing: {tracing_status}</p>
@@ -585,7 +585,7 @@ def render_status_summary(config, schemes: list[dict], metadata: dict) -> None:
             </div>
             <div class="status-card">
                 <span>Indexed chunks</span>
-                <strong>{metadata.get("chunk_count", 0)}</strong>
+                <strong>{metadata.get("indexed_chunk_count", metadata.get("chunk_count", 0))}</strong>
             </div>
             <div class="status-card">
                 <span>Tracing</span>

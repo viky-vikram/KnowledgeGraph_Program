@@ -416,6 +416,31 @@ def test_langchain_document_creation_chunking_and_hash(monkeypatch: pytest.Monke
 
 
 @pytest.mark.api
+def test_derive_category_groups_schemes_by_keyword() -> None:
+    """Category derivation buckets schemes by keyword when no category is provided."""
+
+    import rag_pipeline
+
+    cases = {
+        "Training to Farmers": "Training",
+        "Quality Paddy seed Distribution": "Seeds",
+        "Distribution of Nuclear Poly Hedrosis Virus": "Plant Protection",
+        "Distribution of Gypsum": "Soil & Nutrients",
+        "Pipes carrying water from source to field": "Irrigation",
+        "Subsidy on the assessed Value Added Tax (VAT)": "Subsidy & Tax",
+        "Term loan obtained under NEF scheme of TIIC": "Credit & Finance",
+        "Reservation for Micro Enterprises in TANSIDCO Industrial Estates": "MSME Support",
+        "Unemployed Youth Employment Generation Programme (UYEGP)": "Livelihood",
+    }
+    for scheme_name, expected in cases.items():
+        assert rag_pipeline.derive_category({"scheme_name": scheme_name}) == expected, scheme_name
+
+    # An explicit category on the record is preserved by the build wiring; an
+    # unmatched scheme falls back to "General".
+    assert rag_pipeline.derive_category({"scheme_name": "Something Unrelated"}) == "General"
+
+
+@pytest.mark.api
 def test_neo4j_graph_rebuild_rules_and_mocked_build(monkeypatch: pytest.MonkeyPatch, isolated_config: app_config.AppConfig) -> None:
     """Neo4j metadata controls rebuild decisions and graph operations are mocked."""
 

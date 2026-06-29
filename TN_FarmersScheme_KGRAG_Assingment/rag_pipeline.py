@@ -178,7 +178,10 @@ def build_neo4j_graph(
         "chunk_overlap": config.chunk_overlap,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "document_count": len(documents),
+        # chunk_count = chunks embedded; indexed_chunk_count = SchemeChunk nodes
+        # actually stored in Neo4j (identical chunk text is deduplicated).
         "chunk_count": len(chunks),
+        "indexed_chunk_count": _count_indexed_chunks(config),
         "scheme_count": len(schemes),
     }
     config.index_metadata_path.write_text(
@@ -212,6 +215,56 @@ def _drop_existing_graph(config: AppConfig) -> None:
         pass
 
 
+def _count_indexed_chunks(config: AppConfig) -> int:
+    """Count SchemeChunk nodes actually stored in Neo4j (post-deduplication)."""
+
+    try:
+        graph = Neo4jGraph(
+            url=config.neo4j_uri,
+            username=config.neo4j_username,
+            password=config.neo4j_password,
+            database=config.neo4j_database,
+        )
+        result = graph.query("MATCH (n:SchemeChunk) RETURN count(n) AS count")
+        return result[0]["count"] if result else 0
+    except Exception:  # noqa: BLE001 - count is best-effort metadata
+        LOGGER.warning("Could not count indexed SchemeChunk nodes.")
+        return 0
+
+
+# Ordered keyword -> category map. The first bucket whose any keyword appears in
+# the scheme text wins, so place more specific buckets before generic ones.
+_CATEGORY_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
+    ("Training", ("training", "skill", "demonstration cum training")),
+    ("Seeds", ("seed", "minikit", "seedling")),
+    ("Plant Protection", ("pest", "plant protection", "pesticide", "virus", "polythene mulch")),
+    ("Soil & Nutrients", ("gypsum", "soil", "nutrient", "rhizobium", "micro nutrient")),
+    ("Irrigation", ("pipe", "water", "irrigation", "drip", "sprinkler")),
+    ("Subsidy & Tax", ("subsidy", "stamp duty", "tariff", "rebate", "reimbursement", "value added tax")),
+    ("Credit & Finance", ("loan", "credit", "term loan", "earnest money", "deposit")),
+    ("MSME Support", ("enterprise", "msme", "patent", "trade mark", "industrial estate", "sipcot", "tansidco")),
+    ("Livelihood", ("livelihood", "employment", "youth", "asset less")),
+    ("Demonstration", ("demonstration", "exhibition", "field visit", "research station")),
+]
+
+
+def derive_category(scheme: dict[str, Any]) -> str:
+    """Derive a category label from scheme text when none is provided.
+
+    The scraped dataset has empty ``category`` fields, so this groups schemes by
+    keyword so graph-traversal enrichment can surface genuinely related schemes.
+    """
+
+    text = " ".join(
+        str(scheme.get(field, ""))
+        for field in ("scheme_name", "description", "objective")
+    ).lower()
+    for label, keywords in _CATEGORY_KEYWORDS:
+        if any(keyword in text for keyword in keywords):
+            return label
+    return "General"
+
+
 def _build_kg_structure(schemes: list[dict[str, Any]], config: AppConfig) -> None:
     """Create Scheme, Department, Category nodes and connect to SchemeChunks."""
 
@@ -226,7 +279,9 @@ def _build_kg_structure(schemes: list[dict[str, Any]], config: AppConfig) -> Non
         scheme_id = scheme.get("scheme_id", "")
         scheme_name = scheme.get("scheme_name", "")
         department = scheme.get("department", "")
-        category = scheme.get("category", "")
+        # Fall back to a derived category when the scraped record has none, so
+        # category-based graph enrichment returns meaningful related schemes.
+        category = (scheme.get("category") or "").strip() or derive_category(scheme)
         source_url = scheme.get("scheme_detail_url") or scheme.get("source_list_url", "")
 
         # Merge Scheme node.
