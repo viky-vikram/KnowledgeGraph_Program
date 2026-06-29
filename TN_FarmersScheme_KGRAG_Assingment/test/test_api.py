@@ -262,7 +262,7 @@ def saved_sample_data(isolated_config: app_config.AppConfig) -> list[dict[str, A
 @pytest.mark.api
 @pytest.mark.smoke
 def test_health_check_success_and_degraded_states(isolated_config: app_config.AppConfig) -> None:
-    """Health check reports config, dataset, FAISS, OpenAI, LangSmith, filesystem, and timestamp."""
+    """Health check reports config, dataset, Neo4j, OpenAI, LangSmith, filesystem, and timestamp."""
 
     result = health_check(isolated_config)
     assert result["status"] == "degraded"

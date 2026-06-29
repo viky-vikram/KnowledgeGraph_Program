@@ -453,7 +453,7 @@ def test_sidebar_controls_and_status_are_visible(page: Page) -> None:
     expect(sidebar.get_by_text("Chat model")).to_be_visible()
     expect(sidebar.get_by_text("Embedding model")).to_be_visible()
     expect(get_sidebar_button(page, "Refresh Website Data")).to_be_visible()
-    expect(get_sidebar_button(page, "Rebuild FAISS Index")).to_be_visible()
+    expect(get_sidebar_button(page, "Rebuild Knowledge Graph")).to_be_visible()
     expect(get_sidebar_button(page, "Clear Chat")).to_be_visible()
     expect(sidebar.get_by_text("Retriever results")).to_be_visible()
     text = sidebar.inner_text()
@@ -487,7 +487,7 @@ def test_retriever_slider_changes_without_triggering_admin_actions(page: Page) -
     wait_for_spinner_to_disappear(page)
     after = page.locator("body").inner_text()
     assert "Scraping the Tamil Nadu Government schemes page" not in after
-    assert "Creating embeddings and rebuilding the FAISS index" not in after
+    assert "Creating embeddings and rebuilding the Neo4j Knowledge Graph" not in after
     assert before != "" and after != ""
 
 
@@ -501,7 +501,7 @@ def test_chat_input_or_safe_disabled_state_is_present(page: Page) -> None:
     if app_has_ready_index(page):
         expect(get_chat_input(page)).to_be_enabled()
     else:
-        assert "disabled until a valid FAISS index is available" in body
+        assert "disabled until a valid Neo4j Knowledge Graph is available" in body
 
 
 @pytest.mark.regression
@@ -511,7 +511,7 @@ def test_chat_accepts_multiple_questions_when_index_ready(page: Page) -> None:
 
     open_assistant_tab(page)
     if not app_has_ready_index(page):
-        pytest.skip("Local FAISS index is not ready; chat is correctly disabled.")
+        pytest.skip("Neo4j Knowledge Graph is not ready; chat is correctly disabled.")
     for question in [ENGLISH_QUESTIONS[0], TAMIL_QUESTION]:
         submit_chat_question(page, question)
         expect(page.get_by_text(question)).to_be_visible()
@@ -531,7 +531,7 @@ def test_chat_security_prompts_do_not_expose_secrets_or_execute_html(page: Page,
 
     open_assistant_tab(page)
     if not app_has_ready_index(page):
-        pytest.skip("Local FAISS index is not ready; chat is correctly disabled.")
+        pytest.skip("Neo4j Knowledge Graph is not ready; chat is correctly disabled.")
     dialog_seen: list[str] = []
     page.on("dialog", lambda dialog: (dialog_seen.append(dialog.message), dialog.dismiss()))
     submit_chat_question(page, prompt)
@@ -632,7 +632,7 @@ def test_accessibility_basics(page: Page) -> None:
 
     heading = page.get_by_role("heading", name=APP_TITLE)
     expect(heading).to_be_visible()
-    for name in ["Refresh Website Data", "Rebuild FAISS Index", "Clear Chat"]:
+    for name in ["Refresh Website Data", "Rebuild Knowledge Graph", "Clear Chat"]:
         expect(page.get_by_role("button", name=name)).to_be_visible()
     expect(page.get_by_role("link", name="Open Tamil Nadu schemes page")).to_be_visible()
     page.keyboard.press("Tab")

@@ -1,7 +1,7 @@
 [project]
 name = "tn-agriculture-schemes-rag"
 version = "1.0.0"
-description = "Tamil Nadu Agriculture Schemes RAG assistant (Streamlit + LangChain + FAISS)."
+description = "Tamil Nadu Agriculture Schemes KG-RAG assistant (Streamlit + LangChain + Neo4j Aura)."
 requires-python = ">=3.10"
 
 [tool.pytest.ini_options]
@@ -37,6 +37,5 @@ ignore_missing_imports = true
 no_implicit_optional = true
 
 [tool.bandit]
-# Pickle is used only for the app's own trusted local FAISS index directory.
 skips = ["B101"]
 exclude_dirs = ["venv", "test", ".git"]

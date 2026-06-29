@@ -1,9 +1,9 @@
-# Tamil Nadu Agriculture Schemes RAG
+# Tamil Nadu Agriculture Schemes KG-RAG
 
 A Streamlit Retrieval-Augmented Generation app for answering questions about
 Tamil Nadu Government Agriculture and Farmers Welfare schemes. The app scrapes
-official scheme pages, stores structured records locally, builds a FAISS vector
-index with OpenAI embeddings, and answers with source attribution.
+official scheme pages, stores structured records locally, builds a **Neo4j Aura
+Knowledge Graph** with OpenAI embeddings, and answers with source attribution.
 
 ![App screenshot](assets/app-home.png)
 
@@ -12,7 +12,9 @@ index with OpenAI embeddings, and answers with source attribution.
 ## What Works
 
 - 54 scraped Tamil Nadu agriculture scheme records are included in `data/`.
-- 317 indexed chunks are included in `faiss_index/` for reviewer verification.
+- 317 chunks are embedded and stored as `SchemeChunk` nodes in Neo4j Aura.
+- A knowledge graph links each scheme to its Department and Category, so
+  retrieval can be enriched by graph traversal (related schemes).
 - Answers are grounded in retrieved scheme chunks and include source links.
 - Agricultural-land hero image and farmer-focused visual design are included.
 - Tamil-language questions are supported with Tamil answer instructions.
@@ -20,20 +22,39 @@ index with OpenAI embeddings, and answers with source attribution.
 - The scraper detects redirects and homepage-like content from `tn.gov.in`.
 - Admin actions for scrape/rebuild are gated behind config.
 - Prompt-injection, URL-safety, CSV-injection, API, and UI tests are included.
-- Latest local validation: `56 passed, 1 skipped`.
 
 ## Architecture
 
 ```text
 app.py           Streamlit UI and chat workflow
-config.py        Environment loading, validation, admin settings
+config.py        Environment loading, validation, Neo4j + admin settings
 scraper.py       Official site scraping, parsing, persistence
-rag_pipeline.py  Documents, chunking, FAISS, retrieval, answer generation
-data/            Scraped JSON and CSV scheme records
-faiss_index/     Generated FAISS index and metadata
+rag_pipeline.py  Documents, chunking, Neo4j graph build, retrieval, generation
+data/            Scraped JSON/CSV records and Neo4j build metadata
 assets/          README screenshot and agricultural hero image
 test/            Pytest API and Playwright UI suites
 ```
+
+## Knowledge Graph Model
+
+The Neo4j graph is built from the scraped scheme records:
+
+```text
+(:SchemeChunk {content, embedding, scheme_name, source})  -- vector-indexed chunks
+        |
+     [:PART_OF]
+        v
+(:Scheme {scheme_id, scheme_name, description, benefits, eligibility, source_url})
+     |                         |
+[:IN_DEPARTMENT]          [:IN_CATEGORY]
+     v                         v
+(:Department {name})      (:Category {name})
+```
+
+- `SchemeChunk` nodes carry the OpenAI embedding and are searched by vector
+  similarity (Neo4j vector index, default name `scheme_chunks`).
+- `Scheme`, `Department`, and `Category` nodes form the graph structure used to
+  enrich a retrieved chunk with related schemes that share a department/category.
 
 ## RAG Flow
 
@@ -41,10 +62,13 @@ test/            Pytest API and Playwright UI suites
 2. Extracted scheme records are saved to `data/schemes.json` and `data/schemes.csv`.
 3. `rag_pipeline.py` converts records into LangChain `Document` objects.
 4. Long records are chunked with `RecursiveCharacterTextSplitter`.
-5. OpenAI embeddings are stored in a local FAISS index.
-6. User questions retrieve relevant chunks.
-7. Tamil questions receive a Tamil answer instruction before generation.
-8. The chat model streams an answer only from retrieved context and cites sources.
+5. OpenAI embeddings are stored as `SchemeChunk` nodes in Neo4j Aura, and the
+   `Scheme`/`Department`/`Category` graph structure is created.
+6. User questions retrieve relevant chunks by vector similarity.
+7. Graph traversal enriches results with related schemes from the same
+   department/category.
+8. Tamil questions receive a Tamil answer instruction before generation.
+9. The chat model streams an answer only from retrieved context and cites sources.
 
 ## Prompt Design
 
@@ -93,7 +117,16 @@ Additional rules:
 - Homepage redirects and empty scrape results are rejected.
 - Existing local data is preserved when refresh fails.
 - CSV export neutralizes formula-injection values.
-- FAISS pickle loading is limited to this app's trusted local index directory.
+- Neo4j credentials are read from `.env` and never exposed in the UI or logs.
+
+## Prerequisites
+
+1. **OpenAI API key** — for embeddings and chat completion.
+2. **Neo4j Aura instance** — a free instance works. Create one at
+   [console.neo4j.io](https://console.neo4j.io):
+   - Create a new **AuraDB Free** instance.
+   - Download/copy the generated credentials (you only see the password once).
+   - Note the connection URI (`neo4j+s://<id>.databases.neo4j.io`).
 
 ## Setup
 
@@ -107,13 +140,19 @@ pip install -r requirements.txt
 copy .env.example .env
 ```
 
-Add your OpenAI key to `.env`:
+Add your OpenAI key and Neo4j Aura credentials to `.env`:
 
 ```dotenv
 OPENAI_API_KEY=your_real_openai_api_key
 OPENAI_CHAT_MODEL=gpt-4o-mini
 OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 LANGSMITH_TRACING=false
+
+NEO4J_URI=neo4j+s://xxxxxxxx.databases.neo4j.io
+NEO4J_USERNAME=neo4j
+NEO4J_PASSWORD=your_neo4j_password
+NEO4J_DATABASE=neo4j
+NEO4J_INDEX_NAME=scheme_chunks
 ```
 
 ## Run
@@ -128,9 +167,17 @@ python app.py
 streamlit run app.py
 ```
 
-The submitted repo already includes `data/` and `faiss_index/`, so reviewers can
-inspect the pipeline artifacts immediately. If data or embedding settings are
-changed, use **Rebuild FAISS Index** in the sidebar.
+First-time use:
+
+1. Scraped data is already included in `data/`. (Optional: use **Refresh
+   Website Data** in the sidebar to re-scrape.)
+2. Click **Rebuild Knowledge Graph** in the sidebar to embed the chunks and
+   build the graph in your Neo4j Aura instance. The chat box stays disabled
+   until a valid graph is available.
+3. Ask questions in English or Tamil.
+
+If data or embedding settings change, use **Rebuild Knowledge Graph** again.
+Build state is tracked in `data/neo4j_metadata.json`.
 
 ## Environment
 
@@ -145,7 +192,11 @@ RETRIEVER_K=4
 MAX_INPUT_CHARS=1200
 MAX_HISTORY_MESSAGES=50
 DATA_DIRECTORY=data
-FAISS_DIRECTORY=faiss_index
+NEO4J_URI=neo4j+s://xxxxxxxx.databases.neo4j.io
+NEO4J_USERNAME=neo4j
+NEO4J_PASSWORD=
+NEO4J_DATABASE=neo4j
+NEO4J_INDEX_NAME=scheme_chunks
 APP_ENV=development
 ADMIN_ACTIONS_ENABLED=true
 ADMIN_PASSWORD=
@@ -159,20 +210,13 @@ pytest test/test_ui.py -q
 pytest test -q
 ```
 
-Current verified result:
-
-```text
-56 passed, 1 skipped
-```
-
-The skipped UI test only runs when retrieved source expanders are visible in the
-current page state.
+The API suite mocks Neo4j and OpenAI, so it runs without a live database or
+network access.
 
 ## Security Notes
 
-- Do not commit real `.env` files.
-- Do not paste API keys into the Streamlit UI.
-- Only load FAISS indexes generated by this project.
+- Do not commit real `.env` files (the OpenAI key and Neo4j password live there).
+- Do not paste API keys or database passwords into the Streamlit UI.
 - Verify critical scheme details on the official Tamil Nadu Government website.
 
 ## Disclaimer
