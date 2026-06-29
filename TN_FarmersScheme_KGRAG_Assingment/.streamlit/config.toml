@@ -1,0 +1,21 @@
+[theme]
+base = "light"
+primaryColor = "#176b45"
+backgroundColor = "#f8fbf8"
+secondaryBackgroundColor = "#eef7f0"
+textColor = "#10231f"
+font = "sans serif"
+
+[client]
+# Keep the full Streamlit menu available, including rerun and clear-cache tools.
+toolbarMode = "developer"
+showErrorDetails = false
+
+[server]
+headless = false
+enableCORS = true
+enableXsrfProtection = true
+maxUploadSize = 5
+
+[browser]
+gatherUsageStats = false

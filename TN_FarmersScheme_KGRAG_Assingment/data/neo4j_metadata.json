@@ -1,0 +1,10 @@
+{
+  "dataset_hash": "141091224b385ec0d2194a432e23ccc96a4088a145d1c02e3533677306ec1a27",
+  "embedding_model": "text-embedding-3-small",
+  "chunk_size": 1000,
+  "chunk_overlap": 150,
+  "created_at": "2026-06-29T20:22:48.277758+00:00",
+  "document_count": 54,
+  "chunk_count": 317,
+  "scheme_count": 54
+}
